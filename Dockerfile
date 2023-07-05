@@ -1,5 +1,5 @@
 FROM golang:alpine
-WORKDIR /app/api
-COPY ./api .
+WORKDIR /app
+COPY . .
 RUN go build main.go
 CMD ./main
