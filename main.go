@@ -21,7 +21,7 @@ import (
 
 var ctx = context.Background()
 
-func searchID(input string) (string, error) {
+func SearchUrl(input string) (string, error) {
 	regex := regexp.MustCompile(`https?:\/\/(?:www\.)?([-\d\w.]{2,256}[\d\w]{2,6}\b)*(\/[?\/\d\w\=+&#.-]*)*`)
 	m := regex.FindStringSubmatch(input)
 	if m != nil {
@@ -90,9 +90,8 @@ func main() {
 	if bad != nil {
 		log.Fatal("Error loading .env file")
 	}
-	apihost := os.Getenv("YOUR.HOST")
-	redisurl := os.Getenv("YOUR.REDIS")
-	conn, noconn := redis.ParseURL(redisurl)
+	apihost := os.Getenv("HOST")
+	conn, noconn := redis.ParseURL("REDIS")
 	if noconn != nil {
 		log.Fatal("Error  while connecting  to database")
 	}
@@ -114,7 +113,7 @@ func main() {
 			err := "High Duration ,Not supported"
 			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Orginalurl: nil, Err: &err, Status: nil})
 		}
-		ser, sererr := searchID(uri)
+		ser, sererr := SearchUrl(uri)
 		if sererr != nil {
 			err := sererr.Error()
 			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Orginalurl: nil, Err: &err, Status: nil})
@@ -134,7 +133,7 @@ func main() {
 		}
 		return c.Redirect(res)
 	})
-	app.Post("/bulk", func(c *fiber.Ctx) error {
+	app.Post("/api/bulk", func(c *fiber.Ctx) error {
 		order := c.Body()
 		obj := string(order)
 		var data Arr
@@ -166,7 +165,7 @@ func main() {
 			if duration == 0 {
 				duration += 60
 			}
-			ser, searcherr := searchID(origin)
+			ser, searcherr := SearchUrl(origin)
 			if searcherr != nil {
 				err := searcherr.Error()
 				res_obj = append(res_obj, Shortend{Orginalurl: &origin, Duration: nil, Url: nil, Err: &err, Status: nil})
