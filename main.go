@@ -180,5 +180,7 @@ func main() {
 		}
 		return c.Status(fiber.StatusCreated).JSON(Resp{Short: res_obj})
 	})
-	app.Listen("0.0.0.0:3000")
+	port := os.Getenv("PORT")
+	host := "0.0.0.0:" + port
+	app.Listen(host)
 }
