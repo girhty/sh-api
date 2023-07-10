@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -151,30 +152,36 @@ func main() {
 		}
 		var res_obj []Shortend
 		ca := make(chan Shortend)
+		wg := sync.WaitGroup{}
 		go func(data Arr, ca chan Shortend) {
 			for _, ur := range data.Urls {
 				origin := ur.UrlToshorten
 				duration := ur.Duration
-				if duration > 3600 {
-					err := "Duration Too high"
-					ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: nil, Err: &err, Status: nil}
-					continue
-				}
-				if duration == 0 {
-					duration += 60
-				}
-				ser, searcherr := SearchUrl(origin)
-				if searcherr != nil {
-					err := searcherr.Error()
-					ca <- Shortend{Orginalurl: &origin, Duration: nil, Url: nil, Err: &err, Status: nil}
-					continue
-				}
-				u, fullstr := GenrateUid(ser)
-				shotrendone := apihost + "/" + u[:7]
-				status := client.SetNX(ctx, u[:7], fullstr, time.Duration(duration)*time.Second).Val()
-				stat := !status
-				ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: &shotrendone, Err: nil, Status: &stat}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if duration > 3600 {
+						err := "Duration Too high"
+						ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: nil, Err: &err, Status: nil}
+						return
+					}
+					if duration == 0 {
+						duration += 60
+					}
+					ser, searcherr := SearchUrl(origin)
+					if searcherr != nil {
+						err := searcherr.Error()
+						ca <- Shortend{Orginalurl: &origin, Duration: nil, Url: nil, Err: &err, Status: nil}
+						return
+					}
+					u, fullstr := GenrateUid(ser)
+					shotrendone := apihost + "/" + u[:7]
+					status := client.SetNX(ctx, u[:7], fullstr, time.Duration(duration)*time.Second).Val()
+					stat := !status
+					ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: &shotrendone, Err: nil, Status: &stat}
+				}()
 			}
+			wg.Wait()
 			close(ca)
 		}(data, ca)
 		for res := range ca {
@@ -182,7 +189,5 @@ func main() {
 		}
 		return c.Status(fiber.StatusCreated).JSON(Resp{Short: res_obj})
 	})
-	port := os.Getenv("PORT")
-	host := "0.0.0.0:" + port
-	app.Listen(host)
+	app.Listen("0.0.0.0:3000")
 }
