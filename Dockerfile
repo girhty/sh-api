@@ -1,7 +1,5 @@
 FROM golang:alpine
 WORKDIR /app
-COPY . .
+COPY . /app/
 RUN go mod tidy && go mod download && touch .env && go build main.go
-COPY . .
-EXPOSE 3000
-CMD ./main
+ENTRYPOINT [ "./main" ]
