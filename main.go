@@ -32,26 +32,26 @@ func SearchUrl(input string) (string, error) {
 }
 
 type Bulk struct {
-	UrlToshorten string `json:"url"`
+	UrlToshorten string `json:"short_url"`
 	Duration     int    `json:"duration"`
 }
 type Arr struct {
 	Urls []Bulk `json:"data"`
 }
 type Shortend struct {
-	Url        *string `json:"ShortURL,omitempty"`
-	Duration   *int    `json:"duration,omitempty"`
-	Orginalurl *string `json:"Origin,omitempty"`
-	Status     *bool   `json:"KeyExists,omitempty"`
-	Err        *string `json:"Error,omitempty"`
+	Url         *string `json:"short_url,omitempty"`
+	Duration    *int    `json:"duration,omitempty"`
+	Originalurl *string `json:"original_url,omitempty"`
+	Status      *bool   `json:"key_exists,omitempty"`
+	Err         *string `json:"error,omitempty"`
 }
 type Resp struct {
 	Short []Shortend `json:"data"`
 }
 type BasicERR struct {
-	InvalidBody *string `json:"Body,omitempty"`
-	TooMuchUrls *string `json:"toMany,omitempty"`
-	NoUrls      *string `json:"err,omitempty"`
+	Invalid_body *string `json:"invalid_body,omitempty"`
+	Too_many     *string `json:"too_many,omitempty"`
+	No_urls      *string `json:"no_urls,omitempty"`
 }
 
 func GenrateUid(input string) (string, string) {
@@ -67,11 +67,11 @@ func CheckID(input string, client *redis.Client) (string, error) {
 	m := regex.FindStringSubmatch(input)
 	if m != nil {
 		id := m[0]
-		ch, cherr := client.Get(ctx, id).Result()
-		if cherr != nil {
+		checked_id, checked_err := client.Get(ctx, id).Result()
+		if checked_err != nil {
 			return "", fmt.Errorf("key not found")
 		}
-		decodedBytes, err := base64.StdEncoding.DecodeString(ch)
+		decodedBytes, err := base64.StdEncoding.DecodeString(checked_id)
 		if err != nil {
 			return "", fmt.Errorf("error while getting url")
 		}
@@ -82,14 +82,14 @@ func CheckID(input string, client *redis.Client) (string, error) {
 
 func main() {
 	app := fiber.New()
-	var bad = godotenv.Load()
-	if bad != nil {
+	var env_err = godotenv.Load()
+	if env_err != nil {
 		log.Fatal("Error loading .env file")
 	}
-	apihost := os.Getenv("HOST")
-	rdurl := os.Getenv("REDIS")
-	conn, noconn := redis.ParseURL(rdurl)
-	if noconn != nil {
+	api_host := os.Getenv("HOST")
+	db_url := os.Getenv("REDIS")
+	con, con_err := redis.ParseURL(db_url)
+	if con_err != nil {
 		log.Fatal("Error  while connecting  to database")
 	}
 	app.Use(cors.New(cors.Config{
@@ -97,58 +97,58 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept",
 		AllowMethods: "GET,POST",
 	}))
-	client := redis.NewClient(conn)
+	client := redis.NewClient(con)
 	app.Use(limiter.New())
 	app.Get("/api", func(c *fiber.Ctx) error {
 		uri := c.Query("url")
-		dur, err := strconv.Atoi(c.Query("dur"))
-		if err != nil {
-			err := "Invalid Params Structure"
-			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Orginalurl: nil, Err: &err, Status: nil})
+		duration, duration_err := strconv.Atoi(c.Query("dur"))
+		if duration_err != nil {
+			err := "invalid params structure"
+			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Originalurl: nil, Err: &err, Status: nil})
 		}
-		if dur > 3600 {
-			err := "High Duration ,Not supported"
-			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Orginalurl: nil, Err: &err, Status: nil})
+		if duration > 3600 {
+			err := "High Duration (max 3600)!"
+			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Originalurl: nil, Err: &err, Status: nil})
 		}
-		ser, sererr := SearchUrl(uri)
-		if sererr != nil {
-			err := sererr.Error()
-			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Orginalurl: nil, Err: &err, Status: nil})
+		search, search_err := SearchUrl(uri)
+		if search_err != nil {
+			err := search_err.Error()
+			return c.Status(fiber.StatusBadRequest).JSON(Shortend{Url: nil, Duration: nil, Originalurl: nil, Err: &err, Status: nil})
 		}
-		u, fullstr := GenrateUid(ser)
-		status := client.SetNX(ctx, u[:7], fullstr, time.Duration(dur)*time.Second).Val()
-		c.Response().Header.Add("Cache-Control", "max-age="+fmt.Sprint(dur))
-		shorted := apihost + "/" + u[:7]
+		u, fullstr := GenrateUid(search)
+		status := client.SetNX(ctx, u[:7], fullstr, time.Duration(duration)*time.Second).Val()
+		c.Response().Header.Add("Cache-Control", "max-age="+fmt.Sprint(duration))
+		shorted := api_host + "/" + u[:7]
 		stat := !status
-		return c.Status(fiber.StatusOK).JSON(Shortend{Duration: &dur, Url: &shorted, Status: &stat})
+		return c.Status(fiber.StatusOK).JSON(Shortend{Duration: &duration, Url: &shorted, Status: &stat})
 	})
 	app.Get("/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		res, reserr := CheckID(id, client)
-		if reserr != nil {
-			return c.Status(fiber.StatusBadRequest).SendString(reserr.Error())
+		res, res_err := CheckID(id, client)
+		if res_err != nil {
+			return c.Status(fiber.StatusBadRequest).SendString(res_err.Error())
 		}
 		return c.Redirect(res)
 	})
 	app.Post("/api/bulk", func(c *fiber.Ctx) error {
-		order := c.Body()
-		obj := string(order)
+		req_body := c.Body()
+		obj := string(req_body)
 		var data Arr
-		Parseerr := json.Unmarshal([]byte(obj), &data)
-		if Parseerr != nil {
-			return c.Status(fiber.StatusBadRequest).SendString("Unsupported Data Sturcter")
+		parse_err := json.Unmarshal([]byte(obj), &data)
+		if parse_err != nil {
+			return c.Status(fiber.StatusBadRequest).SendString("unsupported data structure")
 		}
-		if err := c.BodyParser(&data); err != nil {
-			err := "Invalid Data Structure"
-			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{InvalidBody: &err, TooMuchUrls: nil, NoUrls: nil})
+		if body_parse_err := c.BodyParser(&data); body_parse_err != nil {
+			err := "invalid data structure"
+			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{Invalid_body: &err, Too_many: nil, No_urls: nil})
 		}
 		if len(data.Urls) == 0 {
-			err := "No URLS where provided"
-			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{InvalidBody: nil, TooMuchUrls: nil, NoUrls: &err})
+			err := "no urls"
+			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{Invalid_body: nil, Too_many: nil, No_urls: &err})
 		}
 		if len(data.Urls) > 50 {
-			err := "urls amount above 50 not allowed"
-			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{InvalidBody: nil, TooMuchUrls: &err, NoUrls: nil})
+			err := "max allowed urls is 50"
+			return c.Status(fiber.StatusBadRequest).JSON(BasicERR{Invalid_body: nil, Too_many: &err, No_urls: nil})
 		}
 		var res_obj []Shortend
 		ca := make(chan Shortend)
@@ -161,24 +161,24 @@ func main() {
 				go func() {
 					defer wg.Done()
 					if duration > 3600 {
-						err := "Duration Too high"
-						ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: nil, Err: &err, Status: nil}
+						err := "High Duration (max 3600)!"
+						ca <- Shortend{Originalurl: &origin, Duration: &duration, Url: nil, Err: &err, Status: nil}
 						return
 					}
 					if duration == 0 {
 						duration += 60
 					}
-					ser, searcherr := SearchUrl(origin)
-					if searcherr != nil {
-						err := searcherr.Error()
-						ca <- Shortend{Orginalurl: &origin, Duration: nil, Url: nil, Err: &err, Status: nil}
+					search, search_err := SearchUrl(origin)
+					if search_err != nil {
+						err := search_err.Error()
+						ca <- Shortend{Originalurl: &origin, Duration: nil, Url: nil, Err: &err, Status: nil}
 						return
 					}
-					u, fullstr := GenrateUid(ser)
-					shotrendone := apihost + "/" + u[:7]
-					status := client.SetNX(ctx, u[:7], fullstr, time.Duration(duration)*time.Second).Val()
+					uid, fullstr := GenrateUid(search)
+					shotrend_url := api_host + "/" + uid[:7]
+					status := client.SetNX(ctx, uid[:7], fullstr, time.Duration(duration)*time.Second).Val()
 					stat := !status
-					ca <- Shortend{Orginalurl: &origin, Duration: &duration, Url: &shotrendone, Err: nil, Status: &stat}
+					ca <- Shortend{Originalurl: &origin, Duration: &duration, Url: &shotrend_url, Err: nil, Status: &stat}
 				}()
 			}
 			wg.Wait()
@@ -190,6 +190,11 @@ func main() {
 		return c.Status(fiber.StatusCreated).JSON(Resp{Short: res_obj})
 	})
 	port := os.Getenv("PORT")
+	if len(port) == 0 {
+		port = "8000"
+	}
 	host := "0.0.0.0:" + port
-	app.Listen(host)
+	if listen_err := app.Listen(host); listen_err != nil {
+		log.Fatalf("error : %s", listen_err.Error())
+	}
 }

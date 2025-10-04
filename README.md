@@ -36,11 +36,16 @@ You will need the following installed on your local machine:
 
     ```bash
     # The URL that will prefix the generated short code (e.g., http://localhost:8080 or [https://s.co](https://s.co))
-    HOST=http://localhost:8443 # if the server is running locally else just the host name https://example.com
+    HOST=http://localhost:8000 # if the server is running locally else just the host name https://example.com
 
     # The URL for your Redis database (e.g., redis://localhost:6379)
     REDIS=redis://localhost:6379
     ```
+
+    ```bash
+    # The port that the api will be accessible on , default is 8000
+    PORT="8000"
+
 
 3.  **Run the application:**
     ```bash
@@ -66,8 +71,8 @@ For a more consistent and production-ready environment, you can run the applicat
 
     ```bash
     docker run -d \
-      -p 8443:8080 \
-      -e HOST="http://localhost:8443" \
+      -p 8000:8080 \
+      -e HOST="http://localhost:8000" \
       -e REDIS="redis://your-redis-host:6379" \
       --name url-shortener-app \
       go-url-shortener
