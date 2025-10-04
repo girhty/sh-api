@@ -32,7 +32,7 @@ func SearchUrl(input string) (string, error) {
 }
 
 type Bulk struct {
-	UrlToshorten string `json:"short_url"`
+	UrlToshorten string `json:"url"`
 	Duration     int    `json:"duration"`
 }
 type Arr struct {
