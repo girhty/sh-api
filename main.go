@@ -88,16 +88,20 @@ func main() {
 	}
 	api_host := os.Getenv("HOST")
 	db_url := os.Getenv("REDIS")
-	con, con_err := redis.ParseURL(db_url)
-	if con_err != nil {
-		log.Fatal("Error  while connecting  to database")
+	option_parser, option_parser_err := redis.ParseURL(db_url)
+	if option_parser_err != nil {
+		log.Fatalf("Error :%s", option_parser_err.Error())
 	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept",
 		AllowMethods: "GET,POST",
 	}))
-	client := redis.NewClient(con)
+	client := redis.NewClient(option_parser)
+	st := client.Conn().Ping(ctx)
+	if ping_err := st.Err(); ping_err != nil {
+		log.Fatalf("Error %s", ping_err)
+	}
 	app.Use(limiter.New())
 	app.Get("/api", func(c *fiber.Ctx) error {
 		uri := c.Query("url")
