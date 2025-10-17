@@ -197,7 +197,7 @@ func main() {
 	if len(port) == 0 {
 		port = "8000"
 	}
-	host := "0.0.0.0:" + port
+	host := "[::]:" + port
 	if listen_err := app.Listen(host); listen_err != nil {
 		log.Fatalf("error : %s", listen_err.Error())
 	}
